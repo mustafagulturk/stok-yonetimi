@@ -5,13 +5,14 @@ using StokYonetimi.Api.Common;
 using StokYonetimi.Api.Contracts;
 using StokYonetimi.Api.Data;
 using StokYonetimi.Api.Domain;
+using StokYonetimi.Api.Services;
 
 namespace StokYonetimi.Api.Controllers;
 
 [ApiController]
 [Route("api/products")]
 [Authorize]
-public class ProductsController(AppDbContext db) : ControllerBase
+public class ProductsController(AppDbContext db, ProductImportService importer) : ControllerBase
 {
     [HttpGet]
     public async Task<PagedResult<ProductListItemDto>> List(
@@ -57,6 +58,21 @@ public class ProductsController(AppDbContext db) : ControllerBase
             }));
     }
 
+    /// <summary>CSV'den toplu ürün ekleme/güncelleme. dryRun=true önizleme yapar, hiçbir şey kaydetmez.</summary>
+    [HttpPost("import")]
+    [Authorize(Roles = Roles.Admin)]
+    [RequestSizeLimit(2_000_000)]
+    public async Task<ImportResult> Import(IFormFile file, [FromQuery] bool dryRun = true, CancellationToken ct = default)
+    {
+        using var reader = new StreamReader(file.OpenReadStream(), detectEncodingFromByteOrderMarks: true);
+        return await importer.ImportAsync(await reader.ReadToEndAsync(ct), dryRun, ct);
+    }
+
+    [HttpGet("import-template.csv")]
+    public FileContentResult ImportTemplate() =>
+        new(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(ProductImportService.Template)).ToArray(), "text/csv; charset=utf-8")
+        { FileDownloadName = "urun-sablonu.csv" };
+
     [HttpGet("{id:int}")]
     public async Task<ProductDetailDto> Get(int id, CancellationToken ct)
     {
@@ -70,7 +86,7 @@ public class ProductsController(AppDbContext db) : ControllerBase
         var createdAt = await db.Products.Where(x => x.Id == id).Select(x => x.CreatedAt).FirstAsync(ct);
 
         return new ProductDetailDto(p.Id, p.Sku, p.Barcode, p.Name, p.Unit, p.CategoryId, p.CategoryName, p.PurchasePrice,
-            p.SalePrice, p.MinStock, p.IsActive, p.TotalStock, p.IsCritical, stock, createdAt);
+            p.SalePrice, p.MinStock, p.IsActive, p.TotalStock, p.IsCritical, p.DefaultSupplierId, p.DefaultSupplierName, stock, createdAt);
     }
 
     /// <summary>Barkod okuyucu ya da kamera ile hızlı arama. Stok koduyla da eşleşir.</summary>
@@ -160,6 +176,8 @@ public class ProductsController(AppDbContext db) : ControllerBase
             throw AppException.Conflict("Bu barkod başka bir üründe kullanılıyor.");
         if (req.CategoryId is not null && !await db.Categories.AnyAsync(c => c.Id == req.CategoryId, ct))
             throw AppException.NotFound("Kategori");
+        if (req.DefaultSupplierId is not null && !await db.Suppliers.AnyAsync(s => s.Id == req.DefaultSupplierId, ct))
+            throw AppException.NotFound("Tedarikçi");
 
         p.Sku = sku;
         p.Barcode = barcode;
@@ -169,6 +187,7 @@ public class ProductsController(AppDbContext db) : ControllerBase
         p.PurchasePrice = req.PurchasePrice;
         p.SalePrice = req.SalePrice;
         p.MinStock = req.MinStock;
+        p.DefaultSupplierId = req.DefaultSupplierId;
         p.IsActive = req.IsActive;
     }
 }

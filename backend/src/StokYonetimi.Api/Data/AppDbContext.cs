@@ -14,6 +14,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<StockCount> StockCounts => Set<StockCount>();
+    public DbSet<StockCountLine> StockCountLines => Set<StockCountLine>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -24,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.HasSequence<long>("PurchaseOrderNumbers");
+        b.HasSequence<long>("StockCountNumbers");
 
         b.Entity<User>(e =>
         {
@@ -48,6 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Sku).IsUnique();
             e.HasIndex(x => x.Barcode).IsUnique().HasFilter("\"Barcode\" IS NOT NULL");
             e.HasOne(x => x.Category).WithMany(c => c.Products).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.DefaultSupplier).WithMany().OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<Warehouse>(e =>
@@ -98,6 +102,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(x => x.Warehouse).WithMany().OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.CreatedBy).WithMany().OnDelete(DeleteBehavior.SetNull);
             e.HasMany(x => x.Lines).WithOne(l => l.PurchaseOrder).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<StockCount>(e =>
+        {
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasIndex(x => x.Number).IsUnique();
+            // Bir depoda aynı anda tek açık sayım olabilir.
+            e.HasIndex(x => x.WarehouseId).IsUnique().HasFilter("\"Status\" = 'Open'");
+            e.HasOne(x => x.Warehouse).WithMany().OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CreatedBy).WithMany().OnDelete(DeleteBehavior.SetNull);
+            e.HasMany(x => x.Lines).WithOne(l => l.StockCount).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<StockCountLine>(e =>
+        {
+            e.Property(x => x.ExpectedQuantity).HasPrecision(18, 3);
+            e.Property(x => x.CountedQuantity).HasPrecision(18, 3);
+            e.Property(x => x.AppliedDifference).HasPrecision(18, 3);
+            e.HasIndex(x => new { x.StockCountId, x.ProductId }).IsUnique();
+            e.HasOne(x => x.Product).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<PurchaseOrderLine>(e =>

@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using StokYonetimi.Api.Common;
 using StokYonetimi.Api.Data;
+using StokYonetimi.Api.Live;
 using StokYonetimi.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +25,10 @@ builder.Services.AddSingleton<TokenService>();
 builder.Services.AddScoped<StockService>();
 builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<StockCountService>();
+builder.Services.AddScoped<ProductImportService>();
+builder.Services.AddScoped<LiveNotifier>();
+builder.Services.AddSignalR().AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
@@ -37,6 +42,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             NameClaimType = System.Security.Claims.ClaimTypes.Name,
             RoleClaimType = System.Security.Claims.ClaimTypes.Role,
             ClockSkew = TimeSpan.FromMinutes(1),
+        };
+        // Tarayıcı WebSocket bağlantısında başlık gönderemediği için token sorgu dizesinden okunur.
+        o.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                if (ctx.HttpContext.Request.Path.StartsWithSegments("/hubs") && ctx.Request.Query.TryGetValue("access_token", out var token))
+                    ctx.Token = token;
+                return Task.CompletedTask;
+            },
         };
     });
 builder.Services.AddAuthorization();
@@ -95,6 +110,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<StockHub>("/hubs/stock");
 app.MapHealthChecks("/health");
 app.Map("/api/{**rest}", () => Results.Problem(statusCode: 404, title: "İstenen adres bulunamadı."));
 app.MapFallbackToFile("index.html");

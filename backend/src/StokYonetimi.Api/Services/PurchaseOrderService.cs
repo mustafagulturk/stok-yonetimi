@@ -12,7 +12,7 @@ public record ReceiveLineInput(int LineId, decimal Quantity);
 /// Satın alma siparişi akışı: Taslak → Sipariş verildi → (Kısmen) teslim alındı.
 /// Mal kabulü stoğa giriş hareketi oluşturur ve ürünün alış fiyatını günceller.
 /// </summary>
-public class PurchaseOrderService(AppDbContext db, StockService stock, TimeProvider clock)
+public class PurchaseOrderService(AppDbContext db, StockService stock, ReportService reports, TimeProvider clock)
 {
     public async Task<PurchaseOrder> CreateAsync(int supplierId, int warehouseId, DateOnly? expectedDate, string? note,
         IReadOnlyList<OrderLineInput> lines, int? userId, CancellationToken ct = default)
@@ -33,6 +33,29 @@ public class PurchaseOrderService(AppDbContext db, StockService stock, TimeProvi
         db.PurchaseOrders.Add(order);
         await db.SaveChangesAsync(ct);
         return order;
+    }
+
+    /// <summary>
+    /// Kritik seviyedeki ürünleri varsayılan tedarikçilerine göre gruplayıp her tedarikçi için bir taslak sipariş açar.
+    /// Tedarikçisi tanımlı olmayan ya da siparişi zaten yolda olan ürünler atlanır.
+    /// </summary>
+    public async Task<(List<PurchaseOrder> Orders, List<string> Skipped)> CreateFromCriticalAsync(int warehouseId, int? userId, CancellationToken ct = default)
+    {
+        var critical = await reports.CriticalAsync(ct);
+        var skipped = critical.Where(c => c.SuggestedQuantity > 0 && c.SupplierId is null).Select(c => c.Name).ToList();
+        var groups = critical.Where(c => c.SuggestedQuantity > 0 && c.SupplierId is not null).GroupBy(c => c.SupplierId!.Value).ToList();
+        if (groups.Count == 0)
+            throw new AppException(skipped.Count > 0
+                ? "Kritik ürünlerin varsayılan tedarikçisi tanımlı değil."
+                : "Sipariş verilecek kritik ürün yok.");
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var orders = new List<PurchaseOrder>();
+        foreach (var g in groups)
+            orders.Add(await CreateAsync(g.Key, warehouseId, null, "Kritik stoktan otomatik oluşturuldu.",
+                g.Select(c => new OrderLineInput(c.ProductId, c.SuggestedQuantity, c.PurchasePrice)).ToList(), userId, ct));
+        await tx.CommitAsync(ct);
+        return (orders, skipped);
     }
 
     public async Task<PurchaseOrder> UpdateAsync(int id, int supplierId, int warehouseId, DateOnly? expectedDate, string? note,

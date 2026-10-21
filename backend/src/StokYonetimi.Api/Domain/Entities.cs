@@ -13,6 +13,8 @@ public enum MovementType
 
 public enum PurchaseOrderStatus { Draft, Ordered, PartiallyReceived, Received, Cancelled }
 
+public enum StockCountStatus { Open, Completed, Cancelled }
+
 public class User
 {
     public int Id { get; set; }
@@ -43,6 +45,9 @@ public class Product
     public decimal SalePrice { get; set; }
     /// <summary>Toplam stok bu seviyenin altına düşünce kritik sayılır.</summary>
     public decimal MinStock { get; set; }
+    /// <summary>Kritik stoktan otomatik sipariş oluşturulurken kullanılan tedarikçi.</summary>
+    public int? DefaultSupplierId { get; set; }
+    public Supplier? DefaultSupplier { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<StockLevel> StockLevels { get; set; } = [];
@@ -133,4 +138,35 @@ public class PurchaseOrderLine
     public decimal Quantity { get; set; }
     public decimal ReceivedQuantity { get; set; }
     public decimal UnitPrice { get; set; }
+}
+
+/// <summary>Bir deponun toplu sayımı. Açıkken sayılan miktarlar kaydedilir, tamamlanınca farklar stoğa işlenir.</summary>
+public class StockCount
+{
+    public int Id { get; set; }
+    public required string Number { get; set; }
+    public int WarehouseId { get; set; }
+    public Warehouse Warehouse { get; set; } = null!;
+    public StockCountStatus Status { get; set; } = StockCountStatus.Open;
+    public string? Note { get; set; }
+    public int? CreatedById { get; set; }
+    public User? CreatedBy { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
+    public List<StockCountLine> Lines { get; set; } = [];
+}
+
+public class StockCountLine
+{
+    public int Id { get; set; }
+    public int StockCountId { get; set; }
+    public StockCount StockCount { get; set; } = null!;
+    public int ProductId { get; set; }
+    public Product Product { get; set; } = null!;
+    /// <summary>Sayım başladığında sistemdeki miktar.</summary>
+    public decimal ExpectedQuantity { get; set; }
+    /// <summary>Henüz sayılmadıysa boş.</summary>
+    public decimal? CountedQuantity { get; set; }
+    /// <summary>Tamamlanırken stoğa işlenen fark.</summary>
+    public decimal? AppliedDifference { get; set; }
 }

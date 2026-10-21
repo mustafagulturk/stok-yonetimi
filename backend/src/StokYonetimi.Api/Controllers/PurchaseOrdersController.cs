@@ -5,6 +5,7 @@ using StokYonetimi.Api.Common;
 using StokYonetimi.Api.Contracts;
 using StokYonetimi.Api.Data;
 using StokYonetimi.Api.Domain;
+using StokYonetimi.Api.Live;
 using StokYonetimi.Api.Services;
 
 namespace StokYonetimi.Api.Controllers;
@@ -12,7 +13,7 @@ namespace StokYonetimi.Api.Controllers;
 [ApiController]
 [Route("api/purchase-orders")]
 [Authorize]
-public class PurchaseOrdersController(AppDbContext db, PurchaseOrderService orders) : ControllerBase
+public class PurchaseOrdersController(AppDbContext db, PurchaseOrderService orders, LiveNotifier live) : ControllerBase
 {
     [HttpGet]
     public async Task<PagedResult<PurchaseOrderListItemDto>> List(
@@ -46,6 +47,16 @@ public class PurchaseOrdersController(AppDbContext db, PurchaseOrderService orde
         return CreatedAtAction(nameof(Get), new { id = order.Id }, await Get(order.Id, ct));
     }
 
+    [HttpPost("from-critical")]
+    public async Task<FromCriticalResult> FromCritical(FromCriticalRequest req, CancellationToken ct)
+    {
+        var (created, skipped) = await orders.CreateFromCriticalAsync(req.WarehouseId, User.UserId(), ct);
+        var ids = created.Select(o => o.Id).ToList();
+        var items = await db.PurchaseOrders.Where(o => ids.Contains(o.Id)).OrderBy(o => o.Id).Select(Projections.PurchaseOrderListItem).ToListAsync(ct);
+        await live.OrderAsync(User, items[0].Id, $"Kritik stoktan {items.Count} taslak sipariş oluşturuldu");
+        return new FromCriticalResult(items, skipped);
+    }
+
     [HttpPut("{id:int}")]
     public async Task<PurchaseOrderDetailDto> Update(int id, PurchaseOrderRequest req, CancellationToken ct)
     {
@@ -57,14 +68,20 @@ public class PurchaseOrdersController(AppDbContext db, PurchaseOrderService orde
     public async Task<PurchaseOrderDetailDto> Place(int id, CancellationToken ct)
     {
         await orders.PlaceAsync(id, ct);
-        return await Get(id, ct);
+        var o = await Get(id, ct);
+        await live.OrderAsync(User, id, $"{o.Number} {o.SupplierName} firmasına sipariş verildi");
+        return o;
     }
 
     [HttpPost("{id:int}/receive")]
     public async Task<PurchaseOrderDetailDto> Receive(int id, ReceiveRequest req, CancellationToken ct)
     {
         await orders.ReceiveAsync(id, req.Lines.Select(l => new ReceiveLineInput(l.LineId, l.Quantity)).ToList(), User.UserId(), ct);
-        return await Get(id, ct);
+        var o = await Get(id, ct);
+        await live.OrderAsync(User, id, o.Status == PurchaseOrderStatus.Received
+            ? $"{o.Number} tamamen teslim alındı, stok {o.WarehouseName} deposuna işlendi"
+            : $"{o.Number} için kısmi mal kabul yapıldı");
+        return o;
     }
 
     [HttpPost("{id:int}/cancel")]
@@ -72,7 +89,9 @@ public class PurchaseOrdersController(AppDbContext db, PurchaseOrderService orde
     public async Task<PurchaseOrderDetailDto> Cancel(int id, CancellationToken ct)
     {
         await orders.CancelAsync(id, ct);
-        return await Get(id, ct);
+        var o = await Get(id, ct);
+        await live.OrderAsync(User, id, $"{o.Number} iptal edildi");
+        return o;
     }
 
     private static List<OrderLineInput> Lines(PurchaseOrderRequest req) =>

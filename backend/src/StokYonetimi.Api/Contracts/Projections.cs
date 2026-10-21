@@ -15,7 +15,8 @@ public static class Projections
         p.Id, p.Sku, p.Barcode, p.Name, p.Unit, p.CategoryId, p.Category != null ? p.Category.Name : null,
         p.PurchasePrice, p.SalePrice, p.MinStock, p.IsActive,
         p.StockLevels.Sum(s => s.Quantity),
-        p.MinStock > 0 && p.StockLevels.Sum(s => s.Quantity) <= p.MinStock);
+        p.MinStock > 0 && p.StockLevels.Sum(s => s.Quantity) <= p.MinStock,
+        p.DefaultSupplierId, p.DefaultSupplier != null ? p.DefaultSupplier.Name : null);
 
     public static readonly Expression<Func<PurchaseOrder, PurchaseOrderListItemDto>> PurchaseOrderListItem = o => new PurchaseOrderListItemDto(
         o.Id, o.Number, o.SupplierId, o.Supplier.Name, o.WarehouseId, o.Warehouse.Name, o.Status, o.ExpectedDate,

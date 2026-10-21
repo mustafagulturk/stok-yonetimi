@@ -90,6 +90,7 @@ public static class DemoSeeder
             PurchasePrice = d.Buy,
             SalePrice = d.Sell,
             MinStock = d.Min,
+            DefaultSupplier = suppliers[d.Sup],
             CreatedAt = now.AddDays(-75),
         }).ToList();
         products.Add(new Product { Sku = "KG-099", Name = "Eski Tip Makarna 500 g", Category = cats["Kuru Gıda"], Unit = "koli", PurchasePrice = 160, SalePrice = 200, MinStock = 0, IsActive = false, CreatedAt = now.AddDays(-120) });

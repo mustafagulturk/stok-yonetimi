@@ -72,7 +72,8 @@ public class ReportService(AppDbContext db)
             .Where(p => p.IsActive && p.MinStock > 0 && p.StockLevels.Sum(s => s.Quantity) <= p.MinStock)
             .Select(p => new
             {
-                p.Id, p.Sku, p.Name, p.Unit, p.MinStock, p.PurchasePrice,
+                p.Id, p.Sku, p.Name, p.Unit, p.MinStock, p.PurchasePrice, p.DefaultSupplierId,
+                SupplierName = p.DefaultSupplier != null ? p.DefaultSupplier.Name : null,
                 Total = p.StockLevels.Sum(s => s.Quantity),
                 Incoming = db.PurchaseOrderLines
                     .Where(l => l.ProductId == p.Id && (l.PurchaseOrder.Status == PurchaseOrderStatus.Ordered || l.PurchaseOrder.Status == PurchaseOrderStatus.PartiallyReceived))
@@ -82,7 +83,7 @@ public class ReportService(AppDbContext db)
 
         return rows
             .Select(r => new CriticalProductDto(r.Id, r.Sku, r.Name, r.Unit, r.Total, r.MinStock,
-                Math.Max(0, Math.Ceiling(r.MinStock * 2 - r.Total - r.Incoming)), r.PurchasePrice))
+                Math.Max(0, Math.Ceiling(r.MinStock * 2 - r.Total - r.Incoming)), r.PurchasePrice, r.DefaultSupplierId, r.SupplierName))
             .OrderBy(r => r.MinStock == 0 ? 1 : r.TotalStock / r.MinStock)
             .ToList();
     }

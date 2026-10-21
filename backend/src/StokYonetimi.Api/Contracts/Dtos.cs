@@ -36,10 +36,12 @@ public record SupplierRequest(
 public record StockByWarehouseDto(int WarehouseId, string WarehouseName, decimal Quantity);
 public record ProductListItemDto(
     int Id, string Sku, string? Barcode, string Name, string Unit, int? CategoryId, string? CategoryName,
-    decimal PurchasePrice, decimal SalePrice, decimal MinStock, bool IsActive, decimal TotalStock, bool IsCritical);
+    decimal PurchasePrice, decimal SalePrice, decimal MinStock, bool IsActive, decimal TotalStock, bool IsCritical,
+    int? DefaultSupplierId, string? DefaultSupplierName);
 public record ProductDetailDto(
     int Id, string Sku, string? Barcode, string Name, string Unit, int? CategoryId, string? CategoryName,
     decimal PurchasePrice, decimal SalePrice, decimal MinStock, bool IsActive, decimal TotalStock, bool IsCritical,
+    int? DefaultSupplierId, string? DefaultSupplierName,
     IReadOnlyList<StockByWarehouseDto> Stock, DateTime CreatedAt);
 public record ProductRequest(
     [Required(ErrorMessage = "Stok kodu gerekli."), StringLength(50, ErrorMessage = "En fazla {1} karakter olabilir.")] string Sku,
@@ -50,7 +52,8 @@ public record ProductRequest(
     [Range(0, 100_000_000, ErrorMessage = "Alış fiyatı eksi olamaz.")] decimal PurchasePrice,
     [Range(0, 100_000_000, ErrorMessage = "Satış fiyatı eksi olamaz.")] decimal SalePrice,
     [Range(0, 100_000_000, ErrorMessage = "Kritik seviye eksi olamaz.")] decimal MinStock,
-    bool IsActive = true);
+    bool IsActive = true,
+    int? DefaultSupplierId = null);
 
 // Stok hareketleri
 public record MovementDto(
@@ -90,4 +93,24 @@ public record DailyMovementDto(DateOnly Day, decimal InQty, decimal OutQty);
 public record WarehouseValueDto(int WarehouseId, string Name, decimal Value, decimal Quantity);
 public record CategoryValueDto(string Name, decimal Value);
 public record TopProductDto(int ProductId, string Name, string Unit, decimal Quantity);
-public record CriticalProductDto(int ProductId, string Sku, string Name, string Unit, decimal TotalStock, decimal MinStock, decimal SuggestedQuantity, decimal PurchasePrice);
+public record CriticalProductDto(int ProductId, string Sku, string Name, string Unit, decimal TotalStock, decimal MinStock, decimal SuggestedQuantity,
+    decimal PurchasePrice, int? SupplierId, string? SupplierName);
+
+// Kritik stoktan otomatik sipariş
+public record FromCriticalRequest(int WarehouseId);
+public record FromCriticalResult(IReadOnlyList<PurchaseOrderListItemDto> Orders, IReadOnlyList<string> SkippedProducts);
+
+// Toplu sayım
+public record StockCountCreateRequest(int WarehouseId, int? CategoryId, [StringLength(500, ErrorMessage = "En fazla {1} karakter olabilir.")] string? Note);
+public record StockCountListItemDto(int Id, string Number, int WarehouseId, string WarehouseName, StockCountStatus Status,
+    int LineCount, int CountedCount, int DifferenceCount, string? CreatedBy, DateTime CreatedAt, DateTime? CompletedAt);
+public record StockCountLineDto(int Id, int ProductId, string Sku, string? Barcode, string ProductName, string Unit,
+    decimal ExpectedQuantity, decimal? CountedQuantity, decimal? AppliedDifference, decimal UnitCost);
+public record StockCountDetailDto(int Id, string Number, int WarehouseId, string WarehouseName, StockCountStatus Status, string? Note,
+    string? CreatedBy, DateTime CreatedAt, DateTime? CompletedAt, IReadOnlyList<StockCountLineDto> Lines);
+public record CountEntry(int LineId, decimal? CountedQuantity);
+public record CountEntriesRequest(List<CountEntry> Lines);
+
+// Ürün içe aktarma
+public record ImportRowError(int Row, string Message);
+public record ImportResult(int Created, int Updated, int Unchanged, IReadOnlyList<ImportRowError> Errors, bool DryRun);

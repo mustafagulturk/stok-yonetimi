@@ -5,6 +5,7 @@ using StokYonetimi.Api.Common;
 using StokYonetimi.Api.Contracts;
 using StokYonetimi.Api.Data;
 using StokYonetimi.Api.Domain;
+using StokYonetimi.Api.Live;
 using StokYonetimi.Api.Services;
 
 namespace StokYonetimi.Api.Controllers;
@@ -12,7 +13,7 @@ namespace StokYonetimi.Api.Controllers;
 [ApiController]
 [Route("api/stock")]
 [Authorize]
-public class StockController(AppDbContext db, StockService stock) : ControllerBase
+public class StockController(AppDbContext db, StockService stock, LiveNotifier live) : ControllerBase
 {
     [HttpGet("movements")]
     public async Task<PagedResult<MovementDto>> Movements(
@@ -50,7 +51,7 @@ public class StockController(AppDbContext db, StockService stock) : ControllerBa
     {
         var m = await stock.ReceiveAsync(req.ProductId, req.WarehouseId, req.Quantity,
             new MovementInfo(MovementType.In, req.UnitCost, Clean(req.Reference), Clean(req.Note), UserId: User.UserId()), ct);
-        return await Load(m.Id, ct);
+        return await Notify(await Load(m.Id, ct));
     }
 
     [HttpPost("out")]
@@ -58,7 +59,7 @@ public class StockController(AppDbContext db, StockService stock) : ControllerBa
     {
         var m = await stock.IssueAsync(req.ProductId, req.WarehouseId, req.Quantity,
             new MovementInfo(MovementType.Out, null, Clean(req.Reference), Clean(req.Note), UserId: User.UserId()), ct);
-        return await Load(m.Id, ct);
+        return await Notify(await Load(m.Id, ct));
     }
 
     [HttpPost("transfer")]
@@ -66,7 +67,9 @@ public class StockController(AppDbContext db, StockService stock) : ControllerBa
     {
         var (o, i) = await stock.TransferAsync(req.ProductId, req.FromWarehouseId, req.ToWarehouseId, req.Quantity,
             new MovementInfo(MovementType.TransferOut, null, null, Clean(req.Note), UserId: User.UserId()), ct);
-        return [await Load(o.Id, ct), await Load(i.Id, ct)];
+        var legs = new List<MovementDto> { await Load(o.Id, ct), await Load(i.Id, ct) };
+        await live.StockChangedAsync(User, $"{legs[0].ProductName}: {legs[1].Quantity:0.###} {legs[0].Unit} {legs[0].WarehouseName} → {legs[1].WarehouseName}");
+        return legs;
     }
 
     /// <summary>Sayım: fark yoksa 204 döner.</summary>
@@ -75,7 +78,7 @@ public class StockController(AppDbContext db, StockService stock) : ControllerBa
     {
         var m = await stock.AdjustAsync(req.ProductId, req.WarehouseId, req.CountedQuantity,
             new MovementInfo(MovementType.Adjustment, null, "Sayım", Clean(req.Note), UserId: User.UserId()), ct);
-        return m is null ? NoContent() : await Load(m.Id, ct);
+        return m is null ? NoContent() : await Notify(await Load(m.Id, ct));
     }
 
     private IQueryable<StockMovement> Filter(string? q, int? productId, int? warehouseId, MovementType? type, DateOnly? from, DateOnly? to)
@@ -106,6 +109,12 @@ public class StockController(AppDbContext db, StockService stock) : ControllerBa
 
     private static DateTime LocalDayStartUtc(DateOnly day) =>
         TimeZoneInfo.ConvertTimeToUtc(day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), Csv.Istanbul);
+
+    private async Task<MovementDto> Notify(MovementDto m)
+    {
+        await live.MovementAsync(User, m);
+        return m;
+    }
 
     private Task<MovementDto> Load(long id, CancellationToken ct) =>
         db.StockMovements.Where(m => m.Id == id).Select(Projections.Movement).FirstAsync(ct);

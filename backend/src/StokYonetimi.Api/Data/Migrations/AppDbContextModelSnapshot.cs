@@ -24,6 +24,8 @@ namespace StokYonetimi.Api.Data.Migrations
 
             modelBuilder.HasSequence("PurchaseOrderNumbers");
 
+            modelBuilder.HasSequence("StockCountNumbers");
+
             modelBuilder.Entity("StokYonetimi.Api.Domain.Category", b =>
                 {
                     b.Property<int>("Id")
@@ -63,6 +65,9 @@ namespace StokYonetimi.Api.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("DefaultSupplierId")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -100,6 +105,8 @@ namespace StokYonetimi.Api.Data.Migrations
                         .HasFilter("\"Barcode\" IS NOT NULL");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("DefaultSupplierId");
 
                     b.HasIndex("Sku")
                         .IsUnique();
@@ -197,6 +204,90 @@ namespace StokYonetimi.Api.Data.Migrations
                     b.HasIndex("PurchaseOrderId");
 
                     b.ToTable("PurchaseOrderLines");
+                });
+
+            modelBuilder.Entity("StokYonetimi.Api.Domain.StockCount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("WarehouseId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 'Open'");
+
+                    b.ToTable("StockCounts");
+                });
+
+            modelBuilder.Entity("StokYonetimi.Api.Domain.StockCountLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("AppliedDifference")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal?>("CountedQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("ExpectedQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StockCountId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("StockCountId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("StockCountLines");
                 });
 
             modelBuilder.Entity("StokYonetimi.Api.Domain.StockLevel", b =>
@@ -398,7 +489,14 @@ namespace StokYonetimi.Api.Data.Migrations
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("StokYonetimi.Api.Domain.Supplier", "DefaultSupplier")
+                        .WithMany()
+                        .HasForeignKey("DefaultSupplierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Category");
+
+                    b.Navigation("DefaultSupplier");
                 });
 
             modelBuilder.Entity("StokYonetimi.Api.Domain.PurchaseOrder", b =>
@@ -444,6 +542,43 @@ namespace StokYonetimi.Api.Data.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("PurchaseOrder");
+                });
+
+            modelBuilder.Entity("StokYonetimi.Api.Domain.StockCount", b =>
+                {
+                    b.HasOne("StokYonetimi.Api.Domain.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("StokYonetimi.Api.Domain.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("StokYonetimi.Api.Domain.StockCountLine", b =>
+                {
+                    b.HasOne("StokYonetimi.Api.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("StokYonetimi.Api.Domain.StockCount", "StockCount")
+                        .WithMany("Lines")
+                        .HasForeignKey("StockCountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("StockCount");
                 });
 
             modelBuilder.Entity("StokYonetimi.Api.Domain.StockLevel", b =>
@@ -502,6 +637,11 @@ namespace StokYonetimi.Api.Data.Migrations
                 });
 
             modelBuilder.Entity("StokYonetimi.Api.Domain.PurchaseOrder", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("StokYonetimi.Api.Domain.StockCount", b =>
                 {
                     b.Navigation("Lines");
                 });
