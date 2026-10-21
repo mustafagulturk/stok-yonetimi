@@ -73,7 +73,7 @@ public class AuthAndCatalogTests(ApiFixture api)
     }
 
     [Fact]
-    public async Task Csv_formul_enjeksiyonunu_engeller()
+    public void Csv_formul_enjeksiyonunu_engeller()
     {
         var file = Csv.File("x.csv", ["A", "B"], [new object?[] { "=HYPERLINK(\"x\")", -5m }]);
         var text = System.Text.Encoding.UTF8.GetString(file.FileContents);

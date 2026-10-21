@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: stok_yonetimi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__Default: Host=db;Database=stok_yonetimi;Username=postgres;Password=postgres
+      # Üretimde mutlaka kendi gizli anahtarınızla değiştirin
+      Jwt__Key: ${JWT_KEY:-docker-ortami-icin-degistirilmesi-gereken-anahtar}
+      Database__MigrateOnStartup: "true"
+      Database__SeedDemoData: ${SEED_DEMO_DATA:-true}
+
+volumes:
+  pgdata:
