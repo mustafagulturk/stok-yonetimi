@@ -14,6 +14,9 @@ import WarehousesPage from "./pages/WarehousesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import UsersPage from "./pages/UsersPage";
+import StockCountsPage from "./pages/StockCountsPage";
+import StockCountDetailPage from "./pages/StockCountDetailPage";
+import LabelsPage from "./pages/LabelsPage";
 
 export default function App() {
   const { user, loading, isAdmin } = useAuth();
@@ -34,6 +37,7 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="etiketler" element={<LabelsPage />} />
       <Route element={<Layout />}>
         <Route index element={<DashboardPage />} />
         <Route path="urunler" element={<ProductsPage />} />
@@ -43,6 +47,8 @@ export default function App() {
         <Route path="siparisler/yeni" element={<OrderFormPage />} />
         <Route path="siparisler/:id" element={<OrderDetailPage />} />
         <Route path="siparisler/:id/duzenle" element={<OrderFormPage />} />
+        <Route path="sayimlar" element={<StockCountsPage />} />
+        <Route path="sayimlar/:id" element={<StockCountDetailPage />} />
         <Route path="depolar" element={<WarehousesPage />} />
         <Route path="tedarikciler" element={<SuppliersPage />} />
         <Route path="kategoriler" element={<CategoriesPage />} />

@@ -17,7 +17,7 @@ export interface Supplier {
 export interface ProductListItem {
   id: number; sku: string; barcode: string | null; name: string; unit: string; categoryId: number | null;
   categoryName: string | null; purchasePrice: number; salePrice: number; minStock: number; isActive: boolean;
-  totalStock: number; isCritical: boolean;
+  totalStock: number; isCritical: boolean; defaultSupplierId: number | null; defaultSupplierName: string | null;
 }
 export interface ProductDetail extends ProductListItem {
   stock: { warehouseId: number; warehouseName: string; quantity: number }[];
@@ -47,7 +47,7 @@ export interface OrderDetail {
 
 export interface CriticalProduct {
   productId: number; sku: string; name: string; unit: string; totalStock: number; minStock: number;
-  suggestedQuantity: number; purchasePrice: number;
+  suggestedQuantity: number; purchasePrice: number; supplierId: number | null; supplierName: string | null;
 }
 export interface Dashboard {
   productCount: number; warehouseCount: number; stockValue: number; criticalCount: number; outOfStockCount: number;
@@ -58,4 +58,26 @@ export interface Dashboard {
   topOut: { productId: number; name: string; unit: string; quantity: number }[];
   critical: CriticalProduct[];
   recent: Movement[];
+}
+
+export type CountStatus = "Open" | "Completed" | "Cancelled";
+export interface StockCountListItem {
+  id: number; number: string; warehouseId: number; warehouseName: string; status: CountStatus; lineCount: number;
+  countedCount: number; differenceCount: number; createdBy: string | null; createdAt: string; completedAt: string | null;
+}
+export interface StockCountLine {
+  id: number; productId: number; sku: string; barcode: string | null; productName: string; unit: string;
+  expectedQuantity: number; countedQuantity: number | null; appliedDifference: number | null; unitCost: number;
+}
+export interface StockCountDetail {
+  id: number; number: string; warehouseId: number; warehouseName: string; status: CountStatus; note: string | null;
+  createdBy: string | null; createdAt: string; completedAt: string | null; lines: StockCountLine[];
+}
+
+export interface ImportResult { created: number; updated: number; unchanged: number; errors: { row: number; message: string }[]; dryRun: boolean }
+export interface FromCriticalResult { orders: OrderListItem[]; skippedProducts: string[] }
+
+export interface ActivityEvent {
+  kind: "movement" | "critical" | "order" | "stock";
+  message: string; actorId: number | null; actorName: string | null; at: string; productId: number | null; orderId: number | null;
 }

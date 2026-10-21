@@ -133,7 +133,7 @@ export function Empty({ icon, title, text, action }: { icon: ReactNode; title: s
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={clsx("animate-pulse rounded-lg bg-slate-200/70 dark:bg-slate-800", className)} />;
+  return <div className={clsx("shimmer rounded-lg", className)} />;
 }
 
 export function TableSkeleton({ rows = 6 }: { rows?: number }) {

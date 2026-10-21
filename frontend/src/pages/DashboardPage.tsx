@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { clsx } from "clsx";
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { AlertTriangle, ArrowRight, ClipboardList, Package, PackageX, ShoppingCart, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, ClipboardList, Package, PackageX, ShoppingCart, Sparkles, Truck, Wallet } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { dayShort, money, moneyShort, qty } from "../lib/format";
-import type { Dashboard } from "../lib/types";
-import { Badge, Button, PageHeader, Skeleton } from "../components/ui";
+import { spotlight, useCountUp } from "../lib/motion";
+import { useInvalidateStock, useWarehouses } from "../lib/queries";
+import type { CriticalProduct, Dashboard, FromCriticalResult } from "../lib/types";
+import { Badge, Button, Field, Modal, PageHeader, Skeleton } from "../components/ui";
 import { MovementRow } from "./MovementsPage";
 
 const palette = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#64748b"];
@@ -19,6 +22,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [days, setDays] = useState(30);
+  const [autoOrder, setAutoOrder] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard", days],
     queryFn: () => api.get<Dashboard>(`/api/reports/dashboard?days=${days}`),
@@ -56,20 +60,20 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={Wallet} tone="brand" label="Toplam stok değeri" value={money(data.stockValue)} note={`${data.warehouseCount} depoda, alış fiyatıyla`} />
-        <Stat icon={Package} tone="sky" label="Aktif ürün" value={qty(data.productCount)} note={`${data.outOfStockCount} ürün stokta yok`} />
+      <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat icon={Wallet} tone="brand" label="Toplam stok değeri" value={data.stockValue} format={money} note={`${data.warehouseCount} depoda, alış fiyatıyla`} />
+        <Stat icon={Package} tone="sky" label="Aktif ürün" value={data.productCount} note={`${data.outOfStockCount} ürün stokta yok`} />
         <Stat
-          icon={AlertTriangle} tone="rose" label="Kritik stok" value={qty(data.criticalCount)}
+          icon={AlertTriangle} tone="rose" label="Kritik stok" value={data.criticalCount}
           note="Kritik seviyenin altında" onClick={() => navigate("/urunler?stock=critical")}
         />
         <Stat
-          icon={ClipboardList} tone="amber" label="Açık sipariş" value={qty(data.openOrderCount)}
+          icon={ClipboardList} tone="amber" label="Açık sipariş" value={data.openOrderCount}
           note={`${money(data.openOrderValue)} yolda`} onClick={() => navigate("/siparisler?status=open")}
         />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+      <div className="stagger mt-6 grid gap-6 xl:grid-cols-3">
         <section className="card p-5 xl:col-span-2">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -84,12 +88,16 @@ export default function DashboardPage() {
           <div className="h-72">
             <ResponsiveContainer>
               <BarChart data={data.daily} margin={{ left: -12, right: 4, top: 4 }} barGap={1}>
+                <defs>
+                  <linearGradient id="g-in" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#34d399" /><stop offset="1" stopColor="#059669" /></linearGradient>
+                  <linearGradient id="g-out" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fb7185" /><stop offset="1" stopColor="#e11d48" /></linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-200 dark:text-slate-800" vertical={false} />
                 <XAxis dataKey="day" tickFormatter={dayShort} tick={{ fontSize: 12, fill: "#94a3b8" }} tickLine={false} axisLine={false} minTickGap={24} />
                 <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTip />} cursor={{ fill: "rgba(148,163,184,.12)" }} />
-                <Bar dataKey="inQty" name="Giriş" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="outQty" name="Çıkış" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={14} />
+                <Bar dataKey="inQty" name="Giriş" fill="url(#g-in)" radius={[4, 4, 0, 0]} maxBarSize={14} animationDuration={900} />
+                <Bar dataKey="outQty" name="Çıkış" fill="url(#g-out)" radius={[4, 4, 0, 0]} maxBarSize={14} animationDuration={900} animationBegin={150} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -123,7 +131,7 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+      <div className="stagger mt-6 grid gap-6 xl:grid-cols-3">
         <section className="card overflow-hidden xl:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
             <div className="flex items-center gap-2">
@@ -131,15 +139,20 @@ export default function DashboardPage() {
               {data.criticalCount > 0 && <Badge tone="red">{data.criticalCount}</Badge>}
             </div>
             {data.critical.length > 0 && (
-              <Button size="sm" icon={<ShoppingCart className="size-3.5" />} onClick={() => navigate("/siparisler/yeni?kritik=1")}>
-                Sipariş oluştur
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" icon={<ShoppingCart className="size-3.5" />} onClick={() => navigate("/siparisler/yeni?kritik=1")} className="hidden sm:inline-flex">
+                  Elle sipariş
+                </Button>
+                <Button size="sm" icon={<Sparkles className="size-3.5" />} onClick={() => setAutoOrder(true)}>
+                  Otomatik sipariş
+                </Button>
+              </div>
             )}
           </div>
           {data.critical.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-slate-500">Tüm ürünler kritik seviyenin üzerinde. 🎉</p>
           ) : (
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            <ul className="stagger divide-y divide-slate-100 dark:divide-slate-800">
               {data.critical.map((c) => {
                 const ratio = Math.min(1, c.totalStock / c.minStock);
                 return (
@@ -151,12 +164,13 @@ export default function DashboardPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{c.name}</p>
                         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                          <div className={clsx("h-full rounded-full", ratio < 0.34 ? "bg-rose-500" : "bg-amber-500")} style={{ width: `${Math.max(3, ratio * 100)}%` }} />
+                          <div className={clsx("h-full rounded-full animate-grow", ratio < 0.34 ? "bg-rose-500" : "bg-amber-500")} style={{ width: `${Math.max(3, ratio * 100)}%` }} />
                         </div>
                       </div>
                       <div className="text-right text-sm">
                         <p className="tabular font-semibold">{qty(c.totalStock)} <span className="font-normal text-slate-500">/ {qty(c.minStock)} {c.unit}</span></p>
                         <p className="text-xs text-slate-500">{c.suggestedQuantity > 0 ? `Öneri: ${qty(c.suggestedQuantity)} ${c.unit}` : "Siparişi yolda"}</p>
+                        {c.supplierName && <p className="hidden text-[11px] text-slate-400 sm:block">{c.supplierName}</p>}
                       </div>
                     </Link>
                   </li>
@@ -207,7 +221,77 @@ export default function DashboardPage() {
           </table>
         </div>
       </section>
+
+      <AutoOrderDialog open={autoOrder} onClose={() => setAutoOrder(false)} critical={data.critical} />
     </>
+  );
+}
+
+/** Kritik stoktaki ürünlerden, her tedarikçi için ayrı taslak sipariş açar. */
+function AutoOrderDialog({ open, onClose, critical }: { open: boolean; onClose: () => void; critical: CriticalProduct[] }) {
+  const navigate = useNavigate();
+  const invalidate = useInvalidateStock();
+  const { data: warehouses = [] } = useWarehouses();
+  const [warehouseId, setWarehouseId] = useState("");
+  const wid = warehouseId || String(warehouses.find((w) => w.isActive)?.id ?? "");
+
+  const orderable = critical.filter((c) => c.suggestedQuantity > 0);
+  const groups = Object.values(orderable.reduce<Record<string, { name: string; items: CriticalProduct[] }>>((acc, c) => {
+    const k = c.supplierName ?? "";
+    (acc[k] ??= { name: c.supplierName ?? "Tedarikçisi belirsiz", items: [] }).items.push(c);
+    return acc;
+  }, {})).sort((a, b) => b.items.length - a.items.length);
+
+  const create = useMutation({
+    mutationFn: () => api.post<FromCriticalResult>("/api/purchase-orders/from-critical", { warehouseId: Number(wid) }),
+    onSuccess: (r) => {
+      invalidate();
+      onClose();
+      toast.success(`${r.orders.length} taslak sipariş oluşturuldu`, {
+        description: r.skippedProducts.length ? `Tedarikçisi bilinmeyen ${r.skippedProducts.length} ürün atlandı: ${r.skippedProducts.join(", ")}` : "Kontrol edip sipariş verebilirsiniz.",
+        duration: 7000,
+      });
+      navigate(r.orders.length === 1 ? `/siparisler/${r.orders[0].id}` : "/siparisler?status=Draft");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} title="Kritik stoktan otomatik sipariş" wide>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500">
+          Önerilen miktarlar <b>kritik seviyenin iki katına</b> tamamlayacak şekilde, yoldaki siparişler düşülerek hesaplanır.
+          Her tedarikçi için ayrı bir taslak açılır; göndermeden önce düzenleyebilirsiniz.
+        </p>
+        <Field label="Teslim alınacak depo">
+          <select className="field" value={wid} onChange={(e) => setWarehouseId(e.target.value)}>
+            {warehouses.filter((w) => w.isActive).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+          </select>
+        </Field>
+        <div className="stagger grid gap-3 sm:grid-cols-2">
+          {groups.map((g) => (
+            <div key={g.name} className={clsx("rounded-xl border p-3", g.name === "Tedarikçisi belirsiz" ? "border-dashed border-slate-300 opacity-70 dark:border-slate-700" : "border-slate-200 dark:border-slate-800")}>
+              <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Truck className="size-4 text-brand-500" /> {g.name}</p>
+              <ul className="space-y-1 text-sm">
+                {g.items.map((c) => (
+                  <li key={c.productId} className="flex justify-between gap-2">
+                    <span className="truncate text-slate-600 dark:text-slate-300">{c.name}</span>
+                    <span className="tabular shrink-0 font-medium">{qty(c.suggestedQuantity)} {c.unit}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        {!orderable.length && <p className="text-center text-sm text-slate-500">Tüm kritik ürünlerin siparişi zaten yolda.</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Vazgeç</Button>
+          <Button icon={<Sparkles className="size-4" />} disabled={!orderable.length || !wid} loading={create.isPending} onClick={() => create.mutate()}>
+            Taslakları oluştur
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -218,19 +302,20 @@ const statTones = {
   amber: "from-amber-500 to-yellow-500 shadow-amber-500/30",
 };
 
-function Stat({ icon: Icon, tone, label, value, note, onClick }: {
-  icon: typeof Wallet; tone: keyof typeof statTones; label: string; value: string; note: string; onClick?: () => void;
+function Stat({ icon: Icon, tone, label, value, format = (v) => qty(Math.round(v)), note, onClick }: {
+  icon: typeof Wallet; tone: keyof typeof statTones; label: string; value: number; format?: (v: number) => string; note: string; onClick?: () => void;
 }) {
   const Tag = onClick ? "button" : "div";
+  const shown = useCountUp(value);
   return (
-    <Tag onClick={onClick} className={clsx("card group p-5 text-left transition", onClick && "hover:-translate-y-0.5 hover:shadow-md")}>
+    <Tag onClick={onClick} onPointerMove={spotlight} className={clsx("card spot group p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-500/5")}>
       <div className="flex items-start justify-between">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
-        <div className={clsx("grid size-9 place-items-center rounded-xl bg-gradient-to-br text-white shadow-lg", statTones[tone])}>
+        <div className={clsx("grid size-9 place-items-center rounded-xl bg-gradient-to-br text-white shadow-lg transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110", statTones[tone])}>
           <Icon className="size-4" />
         </div>
       </div>
-      <p className="tabular mt-2 text-2xl font-bold tracking-tight">{value}</p>
+      <p className="tabular mt-2 text-2xl font-bold tracking-tight">{format(shown)}</p>
       <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
         {note}
         {onClick && <ArrowRight className="size-3 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />}

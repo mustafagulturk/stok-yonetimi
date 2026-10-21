@@ -10,7 +10,7 @@ export const useSuppliers = () => useQuery({ queryKey: ["suppliers"], queryFn: (
 export function useInvalidateStock() {
   const qc = useQueryClient();
   return () => {
-    for (const key of ["products", "product", "movements", "dashboard", "warehouses", "orders", "order", "critical"])
+    for (const key of ["products", "product", "movements", "dashboard", "warehouses", "orders", "order", "critical", "counts"])
       qc.invalidateQueries({ queryKey: [key] });
   };
 }

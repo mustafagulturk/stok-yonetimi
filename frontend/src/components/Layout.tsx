@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { toast } from "sonner";
 import {
-  ArrowLeftRight, Boxes, ClipboardList, LayoutDashboard, LogOut, Menu, Moon, Package, Plus, ScanLine,
+  ArrowLeftRight, Boxes, ClipboardCheck, ClipboardList, Command, LayoutDashboard, LogOut, Menu, Moon, Package, Plus, ScanLine,
   Search, Sun, Tags, Truck, Users, Warehouse, X,
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -12,12 +12,15 @@ import { useAuth } from "../lib/auth";
 import type { CriticalProduct, ProductListItem } from "../lib/types";
 import { MovementDialog } from "./MovementDialog";
 import { BarcodeScanner, scannerSupported } from "./BarcodeScanner";
+import { CommandPalette } from "./CommandPalette";
+import { Notifications } from "./Notifications";
 
 const nav = [
   { to: "/", label: "Panel", icon: LayoutDashboard, end: true },
   { to: "/urunler", label: "Ürünler", icon: Package },
   { to: "/hareketler", label: "Stok hareketleri", icon: ArrowLeftRight },
   { to: "/siparisler", label: "Satın alma", icon: ClipboardList },
+  { to: "/sayimlar", label: "Sayımlar", icon: ClipboardCheck },
   { section: "Tanımlar" },
   { to: "/depolar", label: "Depolar", icon: Warehouse },
   { to: "/tedarikciler", label: "Tedarikçiler", icon: Truck },
@@ -29,6 +32,7 @@ export function Layout() {
   const { user, isAdmin, logout } = useAuth();
   const [menu, setMenu] = useState(false);
   const [quick, setQuick] = useState(false);
+  const [palette, setPalette] = useState(false);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const location = useLocation();
 
@@ -44,6 +48,11 @@ export function Layout() {
     // "N" tuşu hızlı stok hareketi açar (yazı alanında değilken)
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
+      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setPalette((p) => !p);
+        return;
+      }
       if (e.key.toLowerCase() === "n" && !e.metaKey && !e.ctrlKey && !["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) && !document.querySelector("dialog[open]")) {
         e.preventDefault();
         setQuick(true);
@@ -86,15 +95,18 @@ export function Layout() {
               to={item.to}
               end={"end" in item}
               className={({ isActive }) => clsx(
-                "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
                 isActive ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-slate-100",
               )}
             >
-              <item.icon className="size-4" />
+              {({ isActive }) => (<>
+              {isActive && <span className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-gradient-to-b from-brand-400 to-violet-500 shadow-[0_0_12px] shadow-brand-500 animate-pop" />}
+              <item.icon className="size-4 transition-transform group-hover:scale-110" />
               <span className="flex-1">{item.label}</span>
               {item.to === "/urunler" && !!critical?.length && (
                 <span className="rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white" title="Kritik stoktaki ürünler">{critical.length}</span>
               )}
+              </>)}
             </NavLink>
           );
         })}
@@ -136,7 +148,15 @@ export function Layout() {
           <Menu className="size-5" />
         </button>
         <QuickSearch />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <button
+            onClick={() => setPalette(true)}
+            className="hidden items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-500 transition hover:border-brand-300 hover:text-brand-600 md:inline-flex dark:border-slate-800"
+            aria-label="Komut paleti"
+          >
+            <Command className="size-3.5" /> Komutlar <kbd className="rounded bg-slate-100 px-1.5 font-mono text-[10px] dark:bg-slate-800">Ctrl K</kbd>
+          </button>
+          <Notifications />
           <button onClick={toggleTheme} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Temayı değiştir">
             {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
           </button>
@@ -156,6 +176,7 @@ export function Layout() {
       </main>
 
       <MovementDialog open={quick} onClose={() => setQuick(false)} />
+      <CommandPalette open={palette} onClose={() => setPalette(false)} onNewMovement={() => setQuick(true)} onToggleTheme={toggleTheme} />
     </div>
   );
 }

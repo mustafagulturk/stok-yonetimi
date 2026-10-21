@@ -14,6 +14,18 @@ Birden fazla depo ile çalışan işletmeler için stok takibi ve satın alma uy
 - Yetersiz stokta çıkış yapılamaz, arayüz de bunu kaydetmeden önce gösterir (`130 → 110 paket`)
 - Her yerden `N` kısayolu ile hızlı hareket penceresi
 
+**Canlı çalışma (SignalR)**
+- Bir personel stok hareketi yaptığında, sipariş verdiğinde ya da sayımı bitirdiğinde diğer herkesin ekranı anında tazelenir
+- Başkasının işlemi bildirim olarak düşer, ürün listesinde değişen satır kısa süre parlar
+- Ürün kritik seviyenin altına indiği an herkese uyarı gider; zildeki "Canlı akış" son olayları ve bağlantı durumunu gösterir
+
+**Toplu sayım**
+- Depo (isterseniz kategori) seçilerek sayım başlatılır, o anki miktarların fotoğrafı çekilir
+- Personel barkod okuttukça ürünün sayısı +1 artar ya da miktarı elle girer; her şey otomatik kaydedilir
+- Farklı çıkan ürünler ve parasal etkisi canlı hesaplanır
+- Tamamlanınca fark, **o anki stokla** karşılaştırılarak işlenir: sayım sürerken yapılan giriş/çıkışlar kaybolmaz
+- Bir depoda aynı anda tek açık sayım olabilir (veritabanında filtreli benzersiz indeks)
+
 **Ürünler**
 - Stok kodu, barkod, kategori, birim, alış/satış fiyatı ve kritik seviye
 - Arama, kategori/depo/stok durumu filtreleri, sıralama, sayfalama
@@ -21,12 +33,14 @@ Birden fazla depo ile çalışan işletmeler için stok takibi ve satın alma uy
 - Destekleyen tarayıcılarda (Chrome, Android) **kamerayla barkod okutma**
 - Hareketi olan ürün silinmez, geçmiş bozulmasın diye pasife alınır
 - Stok listesini Excel'de açılabilen CSV olarak indirme
+- **CSV ile toplu içe aktarma**: önce önizleme (yeni / güncellenecek / değişmeyen), hata varsa satır numarasıyla gösterilir ve hiçbir şey kaydedilmez
+- **Barkodlu raf etiketi**: seçilen ürünler için EAN-13 (barkodu olmayanlarda Code 128) etiketi, 50×30 ve 100×50 mm boyutlarında yazdırma. Barkod çizimi kütüphanesiz yazıldı ve zxing ile okunarak doğrulandı
 
 **Satın alma**
 - Taslak → Sipariş verildi → Kısmen teslim → Teslim alındı akışı
 - **Kısmi mal kabul**: gelen miktar girilir, stoğa işlenir, kalan sonra teslim alınabilir
 - Mal kabulünde ürünün alış fiyatı güncellenir, hareketler sipariş numarasıyla bağlanır
-- **Kritik stoktan tek tıkla sipariş**: önerilen miktar, stoğu kritik seviyenin iki katına çıkaracak kadardır ve yolda olan siparişler düşülür
+- **Kritik stoktan otomatik sipariş**: önerilen miktar, stoğu kritik seviyenin iki katına çıkaracak kadardır ve yolda olan siparişler düşülür. Ürünler varsayılan tedarikçilerine göre gruplanır, her tedarikçi için ayrı taslak açılır
 
 **Panel ve raporlar**
 - Toplam stok değeri, kritik ve tükenen ürünler, açık sipariş tutarı
@@ -38,9 +52,28 @@ Birden fazla depo ile çalışan işletmeler için stok takibi ve satın alma uy
 - JWT ile oturum, giriş denemelerine hız sınırı
 
 **Arayüz**
-- Açık/koyu tema, mobil uyumlu, klavyeyle kullanılabilir pencereler, yükleniyor iskeletleri
+- `Ctrl K` komut paleti: ürün arama, sayfalara gitme, işlem başlatma
+- Sayarak açılan panel rakamları, fareyi takip eden kart ışığı, sırayla beliren listeler, parlayan iskeletler
+- Açık/koyu tema (geçişte View Transitions), mobil uyumlu, klavyeyle kullanılabilir pencereler
+- Hareket azaltma tercihi (`prefers-reduced-motion`) açıksa animasyonlar kapanır
 
 ## Ekran görüntüleri
+
+| Canlı bildirim (başka kullanıcının işlemi) | Komut paleti |
+|---|---|
+| ![Canlı bildirim](docs/bildirimler.png) | ![Komut paleti](docs/komut-paleti.png) |
+
+| Toplu sayım | Sayım tamamlandı |
+|---|---|
+| ![Sayım](docs/sayim-fark.png) | ![Sayım tamamlandı](docs/sayim-tamam.png) |
+
+| Otomatik sipariş | CSV içe aktarma |
+|---|---|
+| ![Otomatik sipariş](docs/otomatik-siparis.png) | ![İçe aktarma](docs/ice-aktar.png) |
+
+| Ürün seçimi | Barkodlu etiketler |
+|---|---|
+| ![Seçim](docs/secim.png) | ![Etiketler](docs/etiketler.png) |
 
 | Ürünler | Ürün detayı |
 |---|---|
@@ -68,6 +101,7 @@ Birden fazla depo ile çalışan işletmeler için stok takibi ve satın alma uy
 |---|---|
 | Backend | ASP.NET Core 8 Web API (controller tabanlı), Entity Framework Core 8, Npgsql |
 | Veritabanı | PostgreSQL 16, EF Core migration'ları |
+| Canlı | ASP.NET Core SignalR (JWT ile yetkili hub), @microsoft/signalr |
 | Kimlik | JWT Bearer, BCrypt, rol bazlı yetkilendirme, rate limiting |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router, Recharts |
 | Test | xUnit + WebApplicationFactory ile gerçek PostgreSQL üzerinde entegrasyon testleri |
@@ -88,6 +122,12 @@ Satır dönmezse stok yetersizdir. Veritabanında ayrıca `Quantity >= 0` kısı
 **Hareket defteri.** `StockMovements` tablosu sadece eklenir, hiç güncellenmez. Anlık stok (`StockLevels`) ile hareket geçmişi aynı veritabanı işleminde yazılır, bu yüzden birbirini her zaman tutar. Transferin iki ayağı ortak bir `TransferId` ile bağlıdır, biri başarısız olursa ikisi de geri alınır.
 
 **Satın alma durum makinesi.** Sadece taslaklar düzenlenebilir, sadece verilmiş siparişler teslim alınabilir, mal kabulü yapılmış sipariş iptal edilemez. Aynı siparişe iki kişinin aynı anda mal kabul yapması `SELECT ... FOR UPDATE` ile engellenir. Sipariş numaraları (`SA-2026-00012`) bir PostgreSQL sequence'ından gelir, çakışmaz.
+
+**Sayım farkı doğru anda hesaplanır.** Sayım başlarken beklenen miktar kaydedilir ama stoğa yazılan fark, tamamlama anında `o anki stok − sayılan` olarak hesaplanır ve sayım satırı `FOR UPDATE` ile kilitlenir. Böylece sayım sırasında gelen mal ya da yapılan satış ikinci kez düşülmez.
+
+**İçe aktarma ya hep ya hiç.** Tüm satırlar önce doğrulanır, tek bir hatalı satır varsa hiçbir değişiklik yapılmaz. Hem `;` hem `,` ayraç, Türkçe başlık eş anlamlıları ve `1.050,00` gibi Türkçe sayı biçimi tanınır.
+
+**Canlı olaylar işlemi bozmaz.** Bildirimler işlem başarıyla kaydedildikten sonra gönderilir; SignalR tarafındaki bir hata loglanır ama isteği başarısız saymaz.
 
 **Hatalar Türkçe ve tutarlı.** İş kuralı ihlalleri `AppException` olarak fırlatılır ve `ProblemDetails` formatında döner (`400`, `404`, `409`). Doğrulama hataları alan bazında gelir, form ilgili alanın altında gösterir.
 
@@ -149,6 +189,10 @@ Testler gerçek bir PostgreSQL veritabanına (`stok_yonetimi_test`) karşı çal
 - Kritik stok önerisinin yoldaki siparişleri düşmesi
 - Yetkiler: oturumsuz `401`, personelin yönetici işlemlerinde `403` alması
 - CSV formül enjeksiyonu koruması
+- Sayım sırasında yapılan hareketin fark hesabında kaybolmaması
+- Kritik stoktan tedarikçi başına taslak sipariş, tedarikçisiz ürünlerin atlanması
+- CSV içe aktarmada önizleme, kaydetme ve hatalı satırda hiçbir şeyin yazılmaması
+- SignalR hub'ının oturumsuz bağlantıyı reddetmesi
 
 ## API özeti
 
@@ -162,7 +206,11 @@ Testler gerçek bir PostgreSQL veritabanına (`stok_yonetimi_test`) karşı çal
 | `GET /api/stock/movements` | Hareket geçmişi (tür, depo, tarih filtreleri) |
 | `POST /api/purchase-orders` | Sipariş oluştur |
 | `POST /api/purchase-orders/{id}/place` · `receive` · `cancel` | Sipariş akışı |
+| `POST /api/purchase-orders/from-critical` | Kritik stoktan tedarikçi bazlı taslaklar |
+| `POST /api/products/import?dryRun=` | CSV ile toplu ürün ekleme/güncelleme |
+| `GET/POST /api/stock-counts` · `PUT {id}/lines` · `POST {id}/complete` | Toplu sayım |
 | `GET /api/reports/dashboard` · `critical` | Panel ve kritik stok raporu |
+| `/hubs/stock` (SignalR) | Canlı olay akışı |
 
 Tüm uçlar Swagger'da (`/swagger`) denenebilir.
 

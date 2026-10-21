@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeftRight, BarChart3, Boxes, ClipboardList, ScanLine, ShieldCheck } from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, BarChart3, Boxes, ClipboardCheck, ClipboardList, Radio, ShieldCheck, Tag } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { Button, Field } from "../components/ui";
 
@@ -10,10 +10,12 @@ const demo = [
 ];
 
 const features = [
-  { icon: ArrowLeftRight, text: "Giriş, çıkış, depolar arası transfer ve sayım" },
-  { icon: ClipboardList, text: "Satın alma siparişi ve kısmi mal kabulü" },
+  { icon: ArrowLeftRight, text: "Giriş, çıkış ve depolar arası transfer" },
+  { icon: ClipboardList, text: "Kritik stoktan tedarikçi bazlı otomatik sipariş" },
+  { icon: ClipboardCheck, text: "Barkod okutarak toplu sayım, farklar stoğa işlenir" },
+  { icon: Radio, text: "Ekip arkadaşlarının işlemleri anında ekranınızda" },
+  { icon: Tag, text: "EAN-13 barkodlu raf etiketi yazdırma" },
   { icon: BarChart3, text: "Stok değeri, hareket grafikleri, kritik stok uyarısı" },
-  { icon: ScanLine, text: "Barkod okuyucu ve kamera ile hızlı ürün bulma" },
   { icon: ShieldCheck, text: "Rol bazlı yetki, her hareketin denetim izi" },
 ];
 
@@ -42,8 +44,11 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <div className="relative hidden overflow-hidden bg-slate-900 p-12 text-white lg:flex lg:flex-col">
-        <div className="absolute -left-24 -top-24 size-96 rounded-full bg-brand-600/40 blur-3xl" />
-        <div className="absolute -bottom-32 right-0 size-96 rounded-full bg-violet-600/30 blur-3xl" />
+        <div className="bg-grid absolute inset-0" />
+        <div className="animate-float absolute -left-24 -top-24 size-96 rounded-full bg-brand-600/40 blur-3xl" />
+        <div className="animate-float absolute -bottom-32 right-0 size-96 rounded-full bg-violet-600/30 blur-3xl [animation-delay:-6s]" />
+        <div className="animate-float absolute left-1/2 top-1/3 size-64 rounded-full bg-sky-500/15 blur-3xl [animation-delay:-3s] [animation-duration:16s]" />
+        <FloatingCard />
         <div className="relative flex items-center gap-3">
           <div className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 shadow-lg shadow-brand-600/40">
             <Boxes className="size-6" />
@@ -51,12 +56,14 @@ export default function LoginPage() {
           <span className="text-xl font-bold">Depom</span>
         </div>
         <div className="relative my-auto max-w-lg">
-          <h1 className="text-4xl font-bold leading-tight tracking-tight">Stoğunuz her an, her depoda kontrol altında.</h1>
+          <h1 className="text-4xl font-bold leading-tight tracking-tight">
+            Stoğunuz her an, <span className="text-gradient">her depoda</span> kontrol altında.
+          </h1>
           <p className="mt-4 text-lg text-slate-300">Birden fazla depo ile çalışan işletmeler için stok ve satın alma yönetimi.</p>
-          <ul className="mt-10 space-y-4">
+          <ul className="stagger mt-10 space-y-3.5">
             {features.map((f) => (
               <li key={f.text} className="flex items-center gap-3 text-slate-200">
-                <span className="grid size-9 place-items-center rounded-lg bg-white/10"><f.icon className="size-4" /></span>
+                <span className="grid size-9 place-items-center rounded-lg bg-white/10 ring-1 ring-white/10 backdrop-blur"><f.icon className="size-4" /></span>
                 {f.text}
               </li>
             ))}
@@ -81,7 +88,7 @@ export default function LoginPage() {
             <Field label="Şifre">
               <input className="field" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </Field>
-            {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10">{error}</p>}
+            {error && <p key={error + Date.now()} className="animate-shake rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10">{error}</p>}
             <Button type="submit" loading={busy} className="w-full">Giriş yap</Button>
           </form>
 
@@ -94,7 +101,7 @@ export default function LoginPage() {
                   type="button"
                   disabled={busy}
                   onClick={(e) => submit(e, { email: d.email, password: "demo1234" })}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-left text-sm transition hover:border-brand-300 hover:bg-brand-50 dark:border-slate-800 dark:hover:bg-brand-500/10"
+                  className="group flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-left text-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50 hover:shadow-md hover:shadow-brand-500/10 dark:border-slate-800 dark:hover:bg-brand-500/10"
                 >
                   <span>
                     <span className="block font-medium">{d.label}</span>
@@ -106,6 +113,25 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Sol paneldeki, canlı bildirimi taklit eden yüzen kart. */
+function FloatingCard() {
+  return (
+    <div className="animate-float absolute right-10 top-24 hidden w-64 rounded-2xl bg-white/10 p-4 ring-1 ring-white/15 backdrop-blur-md xl:block [animation-duration:9s]">
+      <div className="flex items-center gap-3">
+        <span className="grid size-9 place-items-center rounded-lg bg-emerald-500/20 text-emerald-300"><ArrowDownToLine className="size-4" /></span>
+        <div className="text-sm">
+          <p className="font-medium">+120 koli mal kabul</p>
+          <p className="text-xs text-slate-300">Ana Depo · az önce</p>
+        </div>
+        <span className="live-dot ml-auto size-2 rounded-full bg-emerald-400" />
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="animate-grow h-full w-3/4 rounded-full bg-gradient-to-r from-emerald-400 to-sky-400" />
       </div>
     </div>
   );

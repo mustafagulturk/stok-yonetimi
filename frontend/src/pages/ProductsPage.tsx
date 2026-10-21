@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { toast } from "sonner";
-import { ArrowDownUp, Download, Package, Plus, Search } from "lucide-react";
+import { ArrowDownUp, Download, Package, Plus, Search, Tag, Upload, X } from "lucide-react";
 import { api, download, qs } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { money, qty } from "../lib/format";
 import { useCategories, useWarehouses } from "../lib/queries";
+import { useLive } from "../lib/live";
 import type { Paged, ProductListItem } from "../lib/types";
 import { ProductForm } from "../components/ProductForm";
+import { ImportDialog } from "../components/ImportDialog";
 import { Badge, Button, Empty, PageHeader, Pagination, TableSkeleton, th, td } from "../components/ui";
 
 const stockFilters = [
@@ -33,6 +36,10 @@ export default function ProductsPage() {
   const { isAdmin } = useAuth();
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const navigate = useNavigate();
+  const { recent } = useLive();
+  const importing = params.get("ice-aktar") === "1";
   const { data: categories = [] } = useCategories();
   const { data: warehouses = [] } = useWarehouses();
 
@@ -70,6 +77,7 @@ export default function ProductsPage() {
             <Button variant="secondary" icon={<Download className="size-4" />} onClick={() => download(`/api/products/export.csv${filter}`, "stok-listesi.csv").catch((e) => toast.error(e.message))}>
               Stok listesi
             </Button>
+            {isAdmin && <Button variant="secondary" icon={<Upload className="size-4" />} onClick={() => set("ice-aktar", "1")}>İçe aktar</Button>}
             {isAdmin && <Button icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>Yeni ürün</Button>}
           </>
         }
@@ -124,6 +132,19 @@ export default function ProductsPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-900/50">
                 <tr>
+                  <th className="w-10 pl-4">
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-brand-600"
+                      aria-label="Sayfadaki tüm ürünleri seç"
+                      checked={data.items.every((p) => selected.has(p.id))}
+                      onChange={(e) => setSelected((s) => {
+                        const n = new Set(s);
+                        data.items.forEach((p) => (e.target.checked ? n.add(p.id) : n.delete(p.id)));
+                        return n;
+                      })}
+                    />
+                  </th>
                   <th className={th}>Ürün</th>
                   <th className={clsx(th, "hidden md:table-cell")}>Kategori</th>
                   <th className={clsx(th, "text-right!")}>Stok</th>
@@ -132,9 +153,23 @@ export default function ProductsPage() {
                   <th className={clsx(th, "hidden text-right! lg:table-cell")}>Değer</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody key={`${filter}${sort}${page}`} className="stagger divide-y divide-slate-100 dark:divide-slate-800">
                 {data.items.map((p) => (
-                  <tr key={p.id} className={clsx("transition hover:bg-slate-50 dark:hover:bg-slate-800/40", !p.isActive && "opacity-50")}>
+                  <tr key={p.id} className={clsx(
+                    "transition hover:bg-slate-50 dark:hover:bg-slate-800/40",
+                    !p.isActive && "opacity-50",
+                    selected.has(p.id) && "bg-brand-50/60 dark:bg-brand-500/5",
+                    recent.has(p.id) && "animate-flash",
+                  )}>
+                    <td className="pl-4">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-brand-600"
+                        aria-label={`${p.name} seç`}
+                        checked={selected.has(p.id)}
+                        onChange={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
+                      />
+                    </td>
                     <td className={td}>
                       <Link to={`/urunler/${p.id}`} className="font-medium hover:text-brand-600">{p.name}</Link>
                       <p className="font-mono text-xs text-slate-500">{p.sku}</p>
@@ -156,6 +191,18 @@ export default function ProductsPage() {
       </div>
 
       <ProductForm open={creating} onClose={() => setCreating(false)} />
+      {isAdmin && <ImportDialog open={importing} onClose={() => set("ice-aktar", "")} />}
+
+      {selected.size > 0 && createPortal(
+        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4 lg:pl-64">
+          <div className="glow-border flex items-center gap-3 rounded-2xl bg-slate-900 py-2 pl-4 pr-2 text-sm text-white shadow-2xl animate-pop dark:bg-slate-800">
+            <span className="tabular"><b>{selected.size}</b> ürün seçili</span>
+            <Button size="sm" icon={<Tag className="size-3.5" />} onClick={() => navigate(`/etiketler?ids=${[...selected].join(",")}`)}>Etiket yazdır</Button>
+            <button onClick={() => setSelected(new Set())} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Seçimi temizle"><X className="size-4" /></button>
+          </div>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, api } from "../lib/api";
-import { useCategories, useInvalidateStock } from "../lib/queries";
+import { useCategories, useInvalidateStock, useSuppliers } from "../lib/queries";
 import type { ProductDetail, ProductListItem } from "../lib/types";
 import { Button, Field, Modal } from "./ui";
 
@@ -23,6 +23,7 @@ export function ProductForm({ open, onClose, product, onSaved }: {
 
 function Form({ product, onClose, onSaved }: { product?: ProductListItem | null; onClose: () => void; onSaved?: (p: ProductDetail) => void }) {
   const { data: categories = [] } = useCategories();
+  const { data: suppliers = [] } = useSuppliers();
   const invalidate = useInvalidateStock();
   const [f, setF] = useState({
     sku: product?.sku ?? "",
@@ -30,6 +31,7 @@ function Form({ product, onClose, onSaved }: { product?: ProductListItem | null;
     name: product?.name ?? "",
     unit: product?.unit ?? "adet",
     categoryId: product?.categoryId ? String(product.categoryId) : "",
+    defaultSupplierId: product?.defaultSupplierId ? String(product.defaultSupplierId) : "",
     purchasePrice: product ? String(product.purchasePrice) : "",
     salePrice: product ? String(product.salePrice) : "",
     minStock: product ? String(product.minStock) : "0",
@@ -45,6 +47,7 @@ function Form({ product, onClose, onSaved }: { product?: ProductListItem | null;
         ...f,
         barcode: f.barcode || null,
         categoryId: f.categoryId ? Number(f.categoryId) : null,
+        defaultSupplierId: f.defaultSupplierId ? Number(f.defaultSupplierId) : null,
         purchasePrice: num(f.purchasePrice),
         salePrice: num(f.salePrice),
         minStock: num(f.minStock),
@@ -99,10 +102,16 @@ function Form({ product, onClose, onSaved }: { product?: ProductListItem | null;
       <Field label="Satış fiyatı (₺)" error={errors.salePrice} hint={margin !== null ? `Kâr marjı %${margin.toFixed(1)}` : undefined}>
         <input className="field tabular" inputMode="decimal" value={f.salePrice} onChange={set("salePrice")} required />
       </Field>
+      <Field label="Varsayılan tedarikçi" error={errors.defaultSupplierId} hint="Kritik stoktan otomatik sipariş bu firmaya açılır.">
+        <select className="field" value={f.defaultSupplierId} onChange={set("defaultSupplierId")}>
+          <option value="">Seçilmedi</option>
+          {suppliers.filter((x) => x.isActive || String(x.id) === f.defaultSupplierId).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+      </Field>
       <Field label="Kritik stok seviyesi" error={errors.minStock} hint="Toplam stok bunun altına inince uyarı verilir. 0 ise takip edilmez.">
         <input className="field tabular" inputMode="decimal" value={f.minStock} onChange={set("minStock")} />
       </Field>
-      <label className="flex items-center gap-3 self-center pt-4 text-sm">
+      <label className="flex items-center gap-3 self-center text-sm sm:col-span-2">
         <input type="checkbox" className="size-4 accent-brand-600" checked={f.isActive} onChange={(e) => setF({ ...f, isActive: e.target.checked })} />
         Aktif (pasif ürünlere hareket yapılamaz)
       </label>

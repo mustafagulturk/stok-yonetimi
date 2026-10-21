@@ -6,7 +6,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
-    proxy: { "/api": "http://localhost:5080" },
+    proxy: {
+      "/api": "http://localhost:5080",
+      "/hubs": { target: "http://localhost:5080", ws: true },
+    },
   },
   build: {
     // Üretim çıktısı doğrudan API'nin wwwroot klasörüne gider, tek sunucudan servis edilir.
