@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{20B5155F-4140-40D1-B67A-24FF462AC031}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StokYonetimi.Api", "src\StokYonetimi.Api\StokYonetimi.Api.csproj", "{E884B0AC-F0A2-4837-A094-B395FB498C10}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{C471691E-A6D6-410A-A14C-68DF741380EA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StokYonetimi.Tests", "tests\StokYonetimi.Tests\StokYonetimi.Tests.csproj", "{72653422-3F75-467A-BF68-F534C4877D63}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E884B0AC-F0A2-4837-A094-B395FB498C10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E884B0AC-F0A2-4837-A094-B395FB498C10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E884B0AC-F0A2-4837-A094-B395FB498C10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E884B0AC-F0A2-4837-A094-B395FB498C10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{72653422-3F75-467A-BF68-F534C4877D63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{72653422-3F75-467A-BF68-F534C4877D63}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{72653422-3F75-467A-BF68-F534C4877D63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{72653422-3F75-467A-BF68-F534C4877D63}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E884B0AC-F0A2-4837-A094-B395FB498C10} = {20B5155F-4140-40D1-B67A-24FF462AC031}
+		{72653422-3F75-467A-BF68-F534C4877D63} = {C471691E-A6D6-410A-A14C-68DF741380EA}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Ortam
+.env
+.DS_Store
+backend/src/StokYonetimi.Api/wwwroot/
